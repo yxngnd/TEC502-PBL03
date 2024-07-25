@@ -25,6 +25,11 @@ struct time_pack {
     int clock_id;     // Identificador do relógio
 };
 
+struct IPPort {
+    std::string address;
+    int port;
+};
+
 // Variáveis globais para drift e ajuste manual do tempo
 std::atomic<double> drift_sec(1.0);  // Drift inicial em segundos
 std::atomic<int64_t> counter(0);
@@ -77,7 +82,7 @@ void send_time_packets(const std::vector<std::string>& ip_addresses, int clock_i
     close(sockfd);
 }
 
-void receive_time(const std::vector<std::string>& ip_addresses, int clock_id) {
+void receive_time(std::string ip_address, int clock_id) {
     int sockfd;
     struct sockaddr_in server_addr, client_addr;
     socklen_t addr_len = sizeof(client_addr);
@@ -91,10 +96,10 @@ void receive_time(const std::vector<std::string>& ip_addresses, int clock_id) {
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(PORT); // Usar a porta constante
-    server_addr.sin_addr.s_addr = inet_addr(ip_addresses[0].c_str());
+    server_addr.sin_addr.s_addr = inet_addr(ip_address.c_str());
 
     if (bind(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        std::cerr << "Error: Unable to bind socket" << std::endl;
+        std::cerr << "Error: Unable to bind socket 1" << std::endl;
         close(sockfd);
         return;
     }
@@ -194,7 +199,7 @@ void handle_sync_request() {
     server_addr.sin_addr.s_addr = INADDR_ANY;
 
     if (bind(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        std::cerr << "Error: Unable to bind socket" << std::endl;
+        std::cerr << "Error: Unable to bind socket 2" << std::endl;
         close(sockfd);
         return;
     }
@@ -240,6 +245,7 @@ void manual_adjustment_thread() {
         }
     }
 }
+ 
 
 int main() {
     const char* clock_id_env = std::getenv("CLOCK_ID");
@@ -258,20 +264,26 @@ int main() {
 
     // Processa a lista de IPs separados por vírgulas
     while ((pos = ip_addresses_str.find(',')) != std::string::npos) {
-        ip_addresses.push_back(ip_addresses_str.substr(0, pos));
-        ip_addresses_str.erase(0, pos + 1);
+        std::string ip = ip_addresses_str.substr(0, pos);
+        ip_addresses.push_back(ip);
+        ip_addresses_str.erase(0, pos + 1); // Remove o IP atual e a vírgula
     }
 
-    // Adicione o último IP, se houver
+    // Adicione o último IP, se houver algum restante após o loop
     if (!ip_addresses_str.empty()) {
         ip_addresses.push_back(ip_addresses_str);
     }
 
+    std::cout << "IP Addresses:" << std::endl;
+    for (const auto& ip : ip_addresses) {
+        std::cout << ip << std::endl;
+    }
+
     // Criar e iniciar as threads
-    std::thread sender(send_time_packets, ip_addresses, clock_id);
-    std::thread receiver(receive_time, ip_addresses, clock_id);
+    std::thread sender(send_time_packets, std::ref(ip_addresses), clock_id);
+    std::thread receiver(receive_time, ip_addresses[0].c_str(), clock_id);
     std::thread adjustment(manual_adjustment_thread);
-    std::thread sync(sync_time_with_master, ip_addresses, clock_id);
+    std::thread sync(sync_time_with_master, std::ref(ip_addresses), clock_id);
     std::thread sync_handler(handle_sync_request);
 
     sender.join();

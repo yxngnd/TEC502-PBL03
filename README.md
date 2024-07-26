@@ -13,5 +13,5 @@ docker pull yxngnd/clock:latest
 Execute a imagem substituindo os campos *clock_id* pelo id do relógio, *"ip_address1,ip_address2,ip_addressN"* pelos ips de todos os relógios que estarão conectados, sendo o ip_adress1 o ip da máquina atual, *port* pela porta que será feita a troca de horário e *mport* pela porta que será feita a sincronização com o mestre:
 
 ```bash
-docker run -e CLOCK_ID=clock_id -e IP_ADDRESSES="ip_address1,ip_address2,ip_addressN" -e PORT=port -e MPORT=mport yxngnd/clock:latest
+docker run -it --network==host -e CLOCK_ID=clock_id -e IP_ADDRESSES="ip_address1,ip_address2,ip_addressN" -e PORT=port -e MPORT=mport yxngnd/clock:latest
 ```
